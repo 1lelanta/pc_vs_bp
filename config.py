@@ -13,7 +13,7 @@ class DataCfg:
     dataset: str = "mnist"
     root: str = "./data"
     batch_size: int = 128
-    val_fraction: float = 0.1      # held out from train for tuning
+    val_fraction: float = 0.1 #  10% of data used for validation
     num_workers: int = 0
 
 
