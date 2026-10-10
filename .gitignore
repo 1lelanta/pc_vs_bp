@@ -1,0 +1,46 @@
+# Byte-compiled Python files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Test, coverage, and type-checker caches
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+.mypy_cache/
+.pyright/
+.ruff_cache/
+
+# Local configuration and secrets
+.env
+.env.*
+!.env.example
+
+# Downloaded datasets and generated experiment outputs
+data/
+results/
+*.pt
+*.pth
+*.ckpt
+
+# Packaging and build artifacts
+build/
+dist/
+*.egg-info/
+pip-wheel-metadata/
+
+# Jupyter and editor files
+.ipynb_checkpoints/
+.vscode/
+.idea/
+
+# Operating-system files
+.DS_Store
+Thumbs.db
