@@ -117,4 +117,45 @@ class PCLearner(LearnerBase):
 
         errors, derivs = self._errors(states)       # state of the system at t=T
         trace.append(self.layer_energies(errors))
-        return InferenceResult(states, errors, derivs, torch.stack(trace))    
+        return InferenceResult(states, errors, derivs, torch.stack(trace))   
+
+        # ------------------------------------------------------------------
+    # Learning: one local weight update after inference has settled
+    # ------------------------------------------------------------------
+    def weight_gradients(self, result: InferenceResult
+                         ) -> List[Tuple[torch.Tensor, torch.Tensor]]:
+        """dF/dW_l and dF/db_l, batch-averaged:
+
+            dF/dW_l = -(eps_l * f'(a_l))^T x_{l-1}
+            dF/db_l = -(eps_l * f'(a_l))
+
+        Uses only layer l's own error and the activity just below it."""
+        batch = result.states[0].size(0)
+        grads = []
+        for i in range(len(self.layers)):
+            delta = result.errors[i] * result.derivs[i]
+            gW = -(delta.t() @ result.states[i]) / batch
+            gb = -delta.mean(dim=0)
+            grads.append((gW, gb))
+        return grads
+
+    @torch.no_grad()
+    def train_step(self, x: torch.Tensor, y: torch.Tensor
+                   ) -> Dict[str, float]:
+        x, y = x.to(self.device), y.to(self.device)
+        target = to_one_hot(y)
+
+        result = self.infer(x, target)              # 1) settle the states
+        for layer, (gW, gb) in zip(self.layers, self.weight_gradients(result)):
+            layer.weight.grad = gW                  # 2) hand local updates to
+            layer.bias.grad = gb                    #    the same optimizer BP uses
+        self.optimizer.step()
+
+        trace = result.energy_trace
+        return {
+            # output-layer energy at t=0 == the plain squared-error loss,
+            # so it is directly comparable to backprop's "loss"
+            "loss": trace[0, -1].item(),
+            # total energy F after inference has settled
+            "energy": trace[-1].sum().item(),
+        } 
