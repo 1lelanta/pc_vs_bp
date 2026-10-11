@@ -6,7 +6,7 @@ whatever metric keys the learner returns, so PC's energies show up in
 the history without the trainer knowing they exist.
 """
 import random
-from typing import Dict
+from typing import Callable, Dict, Optional
 
 import numpy as np
 import torch
