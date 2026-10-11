@@ -4,8 +4,8 @@
 2. Inference behaves as the theory says (zero hidden energy at t=0,
    total energy decreases).
 3. PC training never calls backward() and builds no autograd graph.
-4. PC weight updates match backprop in the small-Jacobian regime, where
-   PC's equilibrium is known to coincide with backprop's gradients.
+4. At equilibrium with a small target nudge, PC's weight updates equal a
+   backprop pass seeded with PC's own (damped) output error.
 
 Run from the project root:  python -m pytest -v
 """
@@ -13,7 +13,6 @@ import torch
 
 from config import ModelCfg, PCCfg, TrainCfg
 from data import to_one_hot
-from models.base import squared_error_loss
 from models.predictive import InferenceResult, PCLearner
 
 SIZES = (20, 16, 12, 10)     # small network, fast tests
@@ -142,30 +141,35 @@ def test_inference_builds_no_autograd_graph():
 
 
 # ----------------------------------------------------------------------
-# 4. Small-Jacobian regime: PC updates ~ backprop gradients
+# 4. Equilibrium PC == backprop recursion seeded with PC's own output error
 # ----------------------------------------------------------------------
-def test_pc_matches_backprop_in_small_jacobian_regime():
-    """At equilibrium, hidden states shift to absorb part of the output
-    error, damping it by roughly (I + J J^T)^-1, where J is the network's
-    Jacobian. When J is small the damping vanishes and PC's local updates
-    coincide with backprop's gradients. We shrink the weights to enter
-    that regime, and give inference ample steps to reach equilibrium."""
-    m = make_learner(steps=300, state_lr=0.1)
-    with torch.no_grad():
-        for layer in m.layers:
-            layer.weight.mul_(0.1)
-
+def test_pc_equilibrium_matches_backprop_seeded_with_its_own_error():
+    """At equilibrium every hidden state satisfies dF/dx = 0, which is
+    exactly the backprop recursion eps_l = W_{l+1}^T (f' * eps_{l+1}).
+    So PC's weight updates equal a backprop pass whose output error is
+    PC's equilibrium output error eps_L (NOT the raw error, which the
+    hidden states have partly absorbed). With a tiny target nudge the
+    states barely move, so the match is near-exact."""
+    m = make_learner(steps=500, state_lr=0.1)
     x = torch.randn(B, SIZES[0], dtype=torch.float64)
     with torch.no_grad():
         out = m.forward(x)
-    target = out + 0.1 * torch.randn_like(out)
+    target = out + 0.001 * torch.randn_like(out)      # tiny nudge
 
     result = m.infer(x, target)
-    pc_w = [gW for gW, _ in m.weight_gradients(result)]
 
-    loss = squared_error_loss(m.forward(x), target)
-    bp = torch.autograd.grad(loss, all_params(m))
-    bp_w = bp[0::2]                                  # weights only
+    # (a) inference really reached equilibrium
+    with torch.no_grad():
+        grads = m.state_gradients(result.errors, result.derivs)
+    for g in grads:
+        assert g.abs().max() < 1e-9
+
+    # (b) PC weight updates == backprop seeded with eps_L
+    pc_w = [gW for gW, _ in m.weight_gradients(result)]
+    eps_L = result.errors[-1]
+    weights = [layer.weight for layer in m.layers]
+    bp_w = torch.autograd.grad(m.forward(x), weights,
+                               grad_outputs=-eps_L / B)
 
     for layer_idx, (p, b) in enumerate(zip(pc_w, bp_w), start=1):
-        assert cosine(p, b) > 0.99, f"layer {layer_idx} misaligned"
+        assert cosine(p, b) > 0.999, f"layer {layer_idx} misaligned"
