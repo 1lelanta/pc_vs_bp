@@ -4,7 +4,8 @@
 2. Inference behaves as the theory says (zero hidden energy at t=0,
    total energy decreases).
 3. PC training never calls backward() and builds no autograd graph.
-4. In the small-error limit, PC weight updates approach backprop's.
+4. PC weight updates match backprop in the small-Jacobian regime, where
+   PC's equilibrium is known to coincide with backprop's gradients.
 
 Run from the project root:  python -m pytest -v
 """
@@ -141,14 +142,23 @@ def test_inference_builds_no_autograd_graph():
 
 
 # ----------------------------------------------------------------------
-# 4. Small-error limit: PC updates ~ backprop gradients
+# 4. Small-Jacobian regime: PC updates ~ backprop gradients
 # ----------------------------------------------------------------------
-def test_pc_approaches_backprop_for_small_errors():
-    m = make_learner(steps=200, state_lr=0.1)
+def test_pc_matches_backprop_in_small_jacobian_regime():
+    """At equilibrium, hidden states shift to absorb part of the output
+    error, damping it by roughly (I + J J^T)^-1, where J is the network's
+    Jacobian. When J is small the damping vanishes and PC's local updates
+    coincide with backprop's gradients. We shrink the weights to enter
+    that regime, and give inference ample steps to reach equilibrium."""
+    m = make_learner(steps=300, state_lr=0.1)
+    with torch.no_grad():
+        for layer in m.layers:
+            layer.weight.mul_(0.1)
+
     x = torch.randn(B, SIZES[0], dtype=torch.float64)
     with torch.no_grad():
         out = m.forward(x)
-    target = out + 0.01 * torch.randn_like(out)      # tiny output error
+    target = out + 0.1 * torch.randn_like(out)
 
     result = m.infer(x, target)
     pc_w = [gW for gW, _ in m.weight_gradients(result)]
@@ -158,4 +168,4 @@ def test_pc_approaches_backprop_for_small_errors():
     bp_w = bp[0::2]                                  # weights only
 
     for layer_idx, (p, b) in enumerate(zip(pc_w, bp_w), start=1):
-        assert cosine(p, b) > 0.95, f"layer {layer_idx} misaligned"
+        assert cosine(p, b) > 0.99, f"layer {layer_idx} misaligned"

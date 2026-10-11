@@ -1,0 +1,33 @@
+{
+  "data": {
+    "dataset": "mnist",
+    "root": "./data",
+    "batch_size": 128,
+    "val_fraction": 0.1,
+    "num_workers": 0
+  },
+  "model": {
+    "layer_sizes": [
+      784,
+      128,
+      64,
+      10
+    ],
+    "activation": "tanh"
+  },
+  "pc": {
+    "inference_steps": 20,
+    "state_lr": 0.1,
+    "init_mode": "forward"
+  },
+  "train": {
+    "epochs": 1,
+    "lr": 0.001,
+    "optimizer": "adam",
+    "seeds": [
+      0
+    ],
+    "device": "cpu",
+    "out_dir": "./results_smoke"
+  }
+}
