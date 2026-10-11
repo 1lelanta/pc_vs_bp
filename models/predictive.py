@@ -77,3 +77,44 @@ class PCLearner(LearnerBase):
         hand-derived gradients against it."""
         errors, _ = self._errors(states)
         return self.layer_energies(errors).sum()
+
+        # ------------------------------------------------------------------
+    # Inference: relax the latent states by gradient descent on F
+    # ------------------------------------------------------------------
+    def state_gradients(self, errors: List[torch.Tensor],
+                        derivs: List[torch.Tensor]) -> List[torch.Tensor]:
+        """dF/dx_l for each HIDDEN state l = 1 .. L-1 (per sample):
+
+            dF/dx_l = eps_l - W_{l+1}^T (eps_{l+1} * f'(a_{l+1}))
+
+        Local: a state is pulled by its own error and by the error of the
+        one layer it helps predict. Nothing else is involved."""
+        deltas = [e * d for e, d in zip(errors, derivs)]
+        grads = []
+        for l in range(1, len(self.layers)):
+            # deltas[l] is layer l+1's delta; layers[l].weight is W_{l+1}
+            grads.append(errors[l - 1] - deltas[l] @ self.layers[l].weight)
+        return grads
+
+    @torch.no_grad()
+    def infer(self, x: torch.Tensor, target: torch.Tensor,
+              steps: int = None, state_lr: float = None) -> InferenceResult:
+        """Clamp input and target, then run T state updates with the
+        weights frozen. Records layer-wise energy at every step."""
+        T = self.pc_cfg.inference_steps if steps is None else steps
+        eta = self.pc_cfg.state_lr if state_lr is None else state_lr
+
+        states = self._forward_states(x)
+        states[-1] = target.clone()                 # clamp output to target
+
+        trace = []
+        for _ in range(T):
+            errors, derivs = self._errors(states)
+            trace.append(self.layer_energies(errors))
+            grads = self.state_gradients(errors, derivs)   # all computed first
+            for l, g in enumerate(grads, start=1):         # then applied together
+                states[l] = states[l] - eta * g
+
+        errors, derivs = self._errors(states)       # state of the system at t=T
+        trace.append(self.layer_energies(errors))
+        return InferenceResult(states, errors, derivs, torch.stack(trace))    
