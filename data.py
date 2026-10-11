@@ -1,13 +1,15 @@
 """Data loading for the PC vs. Backprop study.
 
-Both learners consume exactly the same loaders, so any difference in
-results comes from the learning rule and not from the data pipeline.
+The whole dataset is converted to normalised float tensors ONCE and kept
+in memory. That removes per-batch image decoding, so epoch times measure
+the learning rule and not the data pipeline. Both learners consume
+exactly the same loaders.
 """
 from typing import Tuple
 
 import torch
-from torch.utils.data import DataLoader, random_split
-from torchvision import datasets, transforms
+from torch.utils.data import DataLoader, TensorDataset, random_split
+from torchvision import datasets
 
 from config import DataCfg
 
@@ -20,18 +22,14 @@ _DATASETS = {
 NUM_CLASSES = 10
 
 
-def _flatten(t: torch.Tensor) -> torch.Tensor:
-    """(1, 28, 28) image -> (784,) vector. A named function (not a lambda)
-    so it stays picklable if num_workers > 0."""
-    return t.view(-1)
-
-
-def _build_transform(mean: float, std: float) -> transforms.Compose:
-    return transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((mean,), (std,)),
-        transforms.Lambda(_flatten),
-    ])
+def _load_split(ds_cls, root: str, train: bool, mean: float, std: float
+                ) -> TensorDataset:
+    """Download if needed, then convert the whole split to tensors once.
+    Images become (N, 784) floats in the same normalisation as before."""
+    ds = ds_cls(root, train=train, download=True)
+    x = ds.data.float().div_(255.0).sub_(mean).div_(std).view(len(ds), -1)
+    y = ds.targets.long()
+    return TensorDataset(x, y)
 
 
 def get_loaders(cfg: DataCfg, seed: int = 0
@@ -47,10 +45,8 @@ def get_loaders(cfg: DataCfg, seed: int = 0
                          f"Choose from {list(_DATASETS)}")
 
     ds_cls, mean, std = _DATASETS[cfg.dataset]
-    tf = _build_transform(mean, std)
-
-    full_train = ds_cls(cfg.root, train=True, download=True, transform=tf)
-    test_set = ds_cls(cfg.root, train=False, download=True, transform=tf)
+    full_train = _load_split(ds_cls, cfg.root, True, mean, std)
+    test_set = _load_split(ds_cls, cfg.root, False, mean, std)
 
     n_val = int(len(full_train) * cfg.val_fraction)
     n_train = len(full_train) - n_val
