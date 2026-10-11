@@ -1,0 +1,18 @@
+{
+  "name": "predictive_coding",
+  "seed": 0,
+  "epochs": [
+    {
+      "train_loss": 0.2116977868212594,
+      "train_energy": 0.05786847237083647,
+      "epoch": 1,
+      "val_loss": 0.0976902264157931,
+      "val_acc": 0.9343333333333333,
+      "epoch_time": 13.569636518999687
+    }
+  ],
+  "final": {
+    "test_loss": 0.09561730790138244,
+    "test_acc": 0.9357
+  }
+}

@@ -1,0 +1,18 @@
+{
+  "backprop": {
+    "test_acc_mean": 0.9326,
+    "test_acc_std": 0.0,
+    "test_loss_mean": 0.09035116206407547,
+    "test_loss_std": 0.0,
+    "epoch_time_mean": 7.106551406001017,
+    "n_seeds": 1
+  },
+  "predictive_coding": {
+    "test_acc_mean": 0.9357,
+    "test_acc_std": 0.0,
+    "test_loss_mean": 0.09561730790138244,
+    "test_loss_std": 0.0,
+    "epoch_time_mean": 13.569636518999687,
+    "n_seeds": 1
+  }
+}
