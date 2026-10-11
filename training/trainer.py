@@ -40,12 +40,14 @@ def evaluate_loader(learner: LearnerBase, loader: DataLoader
 class Trainer:
     def __init__(self, learner: LearnerBase, train_loader: DataLoader,
                  val_loader: DataLoader, seed: int = 0,
-                 verbose: bool = True):
+                 verbose: bool = True,
+                 on_epoch_end: Optional[Callable[[int], None]] = None):
         self.learner = learner
         self.train_loader = train_loader
         self.val_loader = val_loader
         self.seed = seed
         self.verbose = verbose
+        self.on_epoch_end = on_epoch_end
 
     def fit(self, epochs: int) -> History:
         history = History(name=self.learner.name, seed=self.seed)
@@ -75,6 +77,9 @@ class Trainer:
                       f"val_loss {val['loss']:.4f} "
                       f"val_acc {val['acc']:.4f} "
                       f"({timer.elapsed:.1f}s)")
+
+            if self.on_epoch_end is not None:
+                self.on_epoch_end(epoch)
         return history
 
     def test(self, test_loader: DataLoader, history: History) -> Dict[str, float]:
