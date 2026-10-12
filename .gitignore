@@ -27,6 +27,8 @@ htmlcov/
 data/
 results/
 results_smoke/
+results_tuned/
+figures/
 *.pt
 *.pth
 *.ckpt
