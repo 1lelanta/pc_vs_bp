@@ -20,7 +20,7 @@ class BackpropLearner(LearnerBase):
         x, y = x.to(self.device), y.to(self.device)
         target = to_one_hot(y)
 
-        self.optimizer.zero_grad()
+        self.optimizer.zero_grad()                  #clears old gradients from the last step
         out = self.forward(x)                       # global forward pass
         loss = squared_error_loss(out, target)      # one global loss
         loss.backward()                             # global backward pass
