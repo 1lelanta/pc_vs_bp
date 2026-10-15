@@ -25,9 +25,7 @@ htmlcov/
 
 # Downloaded datasets and generated experiment outputs
 data/
-results/
-results_smoke/
-results_tuned/
+results*/
 figures/
 *.pt
 *.pth
